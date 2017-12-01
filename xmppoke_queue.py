@@ -41,14 +41,12 @@ class State(object):
 
     def __init__(self,
                  db_host=None,
-                 db_name=None,
                  db_port=None,
                  db_password=None,
                  version_jid=None,
                  version_password=None):
         self.argv = {
             "--db_host": db_host,
-            "--db_name": db_name,
             "--db_port": db_port,
             "--db_password": db_password,
             "--version_jid": version_jid,
@@ -182,7 +180,6 @@ if __name__ == "__main__":
     port = cfg.get("server", "port")
     addr = cfg.get("server", "listen")
 
-    db_name = cfg.get("db", "name")
     db_host = cfg.get("db", "host")
     db_port = cfg.get("db", "port")
     db_password = cfg.get("db", "password")
@@ -192,7 +189,6 @@ if __name__ == "__main__":
 
     log.startLogging(sys.stdout)
     state = State(
-        db_name=db_name,
         db_host=db_host,
         db_port=db_port,
         db_password=db_password,
