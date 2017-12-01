@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import argparse
 import json
-import ConfigParser
+import os
 import sys
 
 from twisted.web import server, resource
@@ -159,33 +159,19 @@ class QueueRequest(resource.Resource):
             return json.dumps(content)
 
 
-def load_config(fp):
-    cfg = ConfigParser.ConfigParser()
-    cfg.readfp(fp)
-    return cfg
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-c", "--config-file",
-        required=True,
-        type=argparse.FileType("r"),
-    )
-
     args = parser.parse_args()
 
-    cfg = load_config(args.config_file)
+    port = int(os.environ.get("XMPPOKE_QUEUE_PORT", 1337))
+    addr = os.environ.get("XMPPOKE_QUEUE_LISTEN", "127.0.0.1")
 
-    port = cfg.get("server", "port")
-    addr = cfg.get("server", "listen")
+    db_host = os.environ.get("XMPPOKE_DB_HOST", None)
+    db_port = os.environ.get("XMPPOKE_DB_PORT", None)
+    db_password = os.environ.get("XMPPOKE_DB_PASSWORD", None)
 
-    db_host = cfg.get("db", "host")
-    db_port = cfg.get("db", "port")
-    db_password = cfg.get("db", "password")
-
-    version_jid = cfg.get("version", "jid")
-    version_password = cfg.get("version", "password")
+    version_jid = os.environ.get("XMPPOKE_VERSION_JID", None)
+    version_password = os.environ.get("XMPPOKE_VERSION_PASSWORD", None)
 
     log.startLogging(sys.stdout)
     state = State(
