@@ -36,6 +36,7 @@ class State(object):
     busy_rejects = 0
     dupes = 0
     finished = 0
+    failed = 0
     running_max = 30
     queued_max = 30
 
@@ -74,8 +75,14 @@ class State(object):
         self.schedule()
 
     def child_done(self, exit_code, item):
-        logmsg(u"finished %s" % (item,))
+        logmsg(u"finished %s with exit code %r" % (item, exit_code,))
         self.finished += 1
+        self.running.remove(item)
+        self.schedule()
+
+    def child_failed(self, err, item):
+        logmsg(u"error while running %s: %r" % (item, err,))
+        self.failed += 1
         self.running.remove(item)
         self.schedule()
 
@@ -84,6 +91,7 @@ class State(object):
             'dupes': self.dupes,
             'busy_rejects': self.busy_rejects,
             'finished': self.finished,
+            'failed': self.failed,
             'queued': len(self.queue),
             'running': len(self.running),
         }
@@ -116,9 +124,9 @@ class State(object):
             args,
             env,
             path="/opt/xmppoke"
-        ).addCallback(
-            self.child_done,
-            item
+        ).addCallbacks(
+            callback=self.child_done, callbackArgs=(item,),
+            errback=self.child_failed, errbackArgs=(item,),
         )
         return True
 
