@@ -56,6 +56,11 @@ class State(object):
         self.queue = []
         self.running = []
 
+    def flush_running(self):
+        logmsg(u"Flushing running queue with %d items in it" % (len(self.running),))
+        self.running = []
+        self.display_report()
+
     def enqueue(self, domain, mode):
         item = QueuedItem(domain, mode)
         if len(self.queue) > self.queued_max:
@@ -77,7 +82,10 @@ class State(object):
     def child_done(self, exit_code, item):
         logmsg(u"finished %s with exit code %r" % (item, exit_code,))
         self.finished += 1
-        self.running.remove(item)
+        try:
+            self.running.remove(item)
+        except ValueError:
+            pass
         self.schedule()
 
     def child_failed(self, err, item):
@@ -102,14 +110,15 @@ class State(object):
 
         env = {
             'LD_LIBRARY_PATH': '/usr/local/lib',
+            'LANG': 'C.UTF-8',
         }
         args = [
             '/opt/xmppoke/xmppoke.lua',
             '--cafile=/etc/ssl/certs/ca-certificates.crt',
-            '--mode=' + item.mode,
+            '--mode=' + item.mode.encode('utf-8'),
             '-d=15',
             '-v',
-            item.domain,
+            item.domain.encode('utf-8'),
         ]
 
         for arg, value in self.argv.items():
@@ -118,16 +127,22 @@ class State(object):
             args.append(arg + "=" + value)
 
         logmsg(u"starting %s" % (item))
-        self.running.append(item)
-        utils.getProcessValue(
-            'luajit',
-            args,
-            env,
-            path="/opt/xmppoke"
-        ).addCallbacks(
-            callback=self.child_done, callbackArgs=(item,),
-            errback=self.child_failed, errbackArgs=(item,),
-        )
+        try:
+            self.running.append(item)
+            utils.getProcessValue(
+                'luajit',
+                args,
+                env,
+                path="/opt/xmppoke"
+            ).addCallbacks(
+                callback=self.child_done, callbackArgs=(item,),
+                errback=self.child_failed, errbackArgs=(item,),
+            )
+        except Exception, e:
+            # as a precaution, remove all similar items from the queue
+            self.queue.remove(item)
+            self.child_failed("failed to execute %r: %s" % (args, e), item)
+            return False
         return True
 
     def display_report(self):
@@ -161,6 +176,11 @@ class QueueRequest(resource.Resource):
                 return json.dumps(content)
             except StateException as e:
                 return json.dumps({"success": False, "error": str(e)})
+        elif 'flush' in request.args and request.args['flush'][0] == '1':
+            self.state.flush_running()
+            request.setHeader(b"content-type", b"application/json")
+            content = {"success": True}
+            return json.dumps(content)
         else:
             request.setHeader(b"content-type", b"application/json")
             content = {"success": False, "error": "Incomplete request."}
